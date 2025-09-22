@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trading Stats Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #121212;
+      margin: 0;
+      padding: 0;
+      color: #e0e0e0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 2rem auto;
+      background: #1e1e1e;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+      padding: 2rem;
+    }
+
+    h1 {
+      color: #fff;
+      margin-bottom: 1rem;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .date-range {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    input[type="date"] {
+      background: #2a2a2a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+    }
+
+    button {
+      background: #64b5f6;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      font-weight: bold;
+      color: #000;
+    }
+    button:hover {
+      background: #42a5f5;
+    }
+
+    /* Overview cards */
+    .overview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .stat-card {
+      flex: 1 1 calc(33% - 1rem);
+      background: #2a2a2a;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-card h3 {
+      margin: 0;
+      color: #64b5f6;
+    }
+    .stat-card p {
+      margin: 0.5rem 0 0;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    /* Calendar */
+    .calendar {
+      margin-top: 2rem;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.5rem;
+    }
+    .day {
+      background: #2a2a2a;
+      border-radius: 6px;
+      text-align: center;
+      padding: 1rem 0;
+      position: relative;
+      cursor: pointer;
+    }
+    .day.has-data {
+      border: 1px solid #64b5f6;
+    }
+    .day:hover {
+      background: #333;
+    }
+    .tick {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 0.8rem;
+      color: #4caf50;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    .modal-content {
+      background: #1e1e1e;
+      padding: 2rem;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 100%;
+      position: relative;
+    }
+    .modal-content h2 {
+      margin-top: 0;
+    }
+    .close {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .close:hover {
+      color: #fff;
+    }
+
+    @media (max-width: 600px) {
+      .stat-card {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Trading Stats Dashboard</h1>
+
+    <div class="controls">
+      <div>
+        <button id="prevMonth">◀</button>
+        <span id="monthLabel"></span>
+        <button id="nextMonth">▶</button>
+      </div>
+      <div class="date-range">
+        <label>From:</label>
+        <input type="date" id="startDate">
+        <label>To:</label>
+        <input type="date" id="endDate">
+        <button id="applyRange">Apply</button>
+      </div>
+    </div>
+
+    <div class="overview" id="overview-stats"></div>
+    <div class="calendar" id="calendar"></div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="close">&times;</span>
+      <h2 id="modal-date"></h2>
+      <div id="modal-details"></div>
+    </div>
+  </div>
+
+  <script>
+    const repoUrl = "https://raw.githubusercontent.com/Ondiek-source/Career/main/Data/stats.json";
+    let allData = [];
+    let currentMonth = new Date().getMonth();
+    let currentYear = new Date().getFullYear();
+
+    async function fetchData() {
+      const resp = await fetch(repoUrl);
+      return resp.json();
+    }
+
+    function calculateOverview(data) {
+      const totalTrades = data.reduce((a,b)=>a + (b.total_trades||0), 0);
+      const totalWins = data.reduce((a,b)=>a + (b.winning_trades||0), 0);
+      const totalLosses = data.reduce((a,b)=>a + (b.losing_trades||0), 0);
+      const totalPnL = data.reduce((a,b)=>a + (b.total_pnl||0), 0);
+
+      return {
+        "Total Profit": `$${totalPnL.toFixed(2)}`,
+        "Total Trades": totalTrades,
+        "Win Rate": totalTrades ? ((totalWins/totalTrades)*100).toFixed(2)+"%" : "0%",
+        "Winning Trades": totalWins,
+        "Losing Trades": totalLosses,
+      }
+    }
+
+    function renderOverview(stats) {
+      const container = document.getElementById("overview-stats");
+      container.innerHTML = "";
+      for (let [k,v] of Object.entries(stats)) {
+        container.innerHTML += `
+          <div class="stat-card">
+            <h3>${k}</h3>
+            <p>${v}</p>
+          </div>`;
+      }
+    }
+
+    function renderCalendar(data) {
+      const cal = document.getElementById("calendar");
+      cal.innerHTML = "";
+      const monthLabel = document.getElementById("monthLabel");
+      const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      monthLabel.innerText = `${monthNames[currentMonth]} ${currentYear}`;
+      const daysInMonth = new Date(currentYear, currentMonth+1, 0).getDate();
+
+      for (let i=1; i<=daysInMonth; i++) {
+        const dayData = data.find(d => {
+          const dt = new Date(d.Date);
+          return dt.getDate() === i && dt.getMonth() === currentMonth && dt.getFullYear() === currentYear;
+        });
+
+        cal.innerHTML += `
+          <div class="day ${dayData ? 'has-data':''}" data-day="${i}">
+            ${i}
+            ${dayData ? '<span class="tick">✔</span>' : ''}
+          </div>`;
+      }
+
+      document.querySelectorAll(".day.has-data").forEach(el=>{
+        el.addEventListener("click", ()=>{
+          const d = data.find(x => {
+            const dt = new Date(x.Date);
+            return dt.getDate() == el.dataset.day && dt.getMonth() === currentMonth && dt.getFullYear() === currentYear;
+          });
+          showModal(d);
+        });
+      });
+    }
+
+    function showModal(entry) {
+      document.getElementById("modal-date").innerText = entry.Date;
+      document.getElementById("modal-details").innerHTML = `
+        <ul>
+          <li>Account Balance: $${entry.account_balance}</li>
+          <li>Total PnL: $${entry.total_pnl}</li>
+          <li>Win Rate: ${entry.win_rate}%</li>
+          <li>Total Trades: ${entry.total_trades}</li>
+          <li>Winning Trades: ${entry.winning_trades}</li>
+          <li>Losing Trades: ${entry.losing_trades}</li>
+          <li>Consecutive Losses: ${entry.consecutive_losses}</li>
+          <li>Martingale Step: ${entry.martingale_step}</li>
+          <li>Max Drawdown: ${entry.max_drawdown}</li>
+          <li>Drawdown: ${entry.drawdown}</li>
+        </ul>`;
+      document.getElementById("modal").style.display = "flex";
+    }
+
+    document.getElementById("close").onclick = ()=>document.getElementById("modal").style.display="none";
+    window.onclick = (e)=>{ if(e.target.id==="modal") document.getElementById("modal").style.display="none" }
+
+    // Month navigation
+    document.getElementById("prevMonth").onclick = ()=>{
+      currentMonth--;
+      if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+      refreshDashboard();
+    };
+    document.getElementById("nextMonth").onclick = ()=>{
+      currentMonth++;
+      if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+      refreshDashboard();
+    };
+
+    // Apply date range
+    document.getElementById("applyRange").onclick = ()=>{
+      const start = new Date(document.getElementById("startDate").value);
+      const end = new Date(document.getElementById("endDate").value);
+      const filtered = allData.filter(d=>{
+        const dt = new Date(d.Date);
+        return dt >= start && dt <= end;
+      });
+      renderOverview(calculateOverview(filtered));
+      renderCalendar(filtered);
+    };
+
+    function refreshDashboard() {
+      const filtered = allData.filter(d=>{
+        const dt = new Date(d.Date);
+        return dt.getMonth() === currentMonth && dt.getFullYear() === currentYear;
+      });
+      renderOverview(calculateOverview(filtered));
+      renderCalendar(filtered);
+    }
+
+    fetchData().then(data=>{
+      allData = data;
+      // Default start/end = current date
+      const today = new Date();
+      document.getElementById("startDate").value = today.toISOString().split("T")[0];
+      document.getElementById("endDate").value = today.toISOString().split("T")[0];
+      refreshDashboard();
+    });
+  </script>
+</body>
+</html>
