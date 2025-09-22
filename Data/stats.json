@@ -11,5 +11,18 @@
     "martingale_step": 0,
     "max_drawdown": 8.34,
     "drawdown": 0
+  },
+  {
+    "timestamp": "2025-09-22 07:45",
+    "account_balance": 51.18,
+    "total_pnl": 14.18,
+    "win_rate": 77.27,
+    "total_trades": 22,
+    "winning_trades": 17,
+    "losing_trades": 5,
+    "consecutive_losses": 0,
+    "martingale_step": 0,
+    "max_drawdown": 8.34,
+    "drawdown": 0
   }
 ]
